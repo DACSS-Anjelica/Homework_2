@@ -1,0 +1,134 @@
+<center><img src="https://github.com/DACSS-CSSmeths/guidelines/blob/main/pics/small_logo_ccs_meths.jpg?raw=true" width="700"/></center>
+
+# Social Networks in R
+
+------------------------------------------------------------------------
+
+## 1. Load in libraries
+
+```{r}
+library(igraph)
+library(ggraph)
+library(ggplot2)
+```
+
+2.  Set seed for randomization
+
+```{r}
+set.seed(123)
+```
+
+### II. Create network from dataframes
+
+This network is undirected, named, and weighted. It has 11 vertices, and 14 edges.
+
+The vertex attributes are `wonOscar` (numeric) `color`, `name`, `id`)
+
+The edge attributes are `weight` (numeric)
+
+```{r}
+
+actors <- read_graph("https://raw.githubusercontent.com/DACSS-Anjelica/Homework_2/main/hollywood.graphml", format = "graphml")
+
+summary(actors)
+```
+
+```{r}
+ggraph(graph = actors) +
+  geom_edge_link(aes(label = weight), alpha = 0.5, label_size = 2.5, angle_calc = "along") +
+  geom_node_text(aes(label = name, color = as.factor(wonOscar)), repel = TRUE) +
+  scale_color_manual(values = c("red", "blue")) +
+  theme_graph()
+```
+
+### Compute node central measures:
+
+```{r}
+# Eigenvector Centrality
+eigen <- eigen_centrality(actors)$vector
+
+# Closeness
+close <- closeness(actors, normalized = TRUE)
+
+#Betweeness
+betw  <- betweenness(actors, normalized = TRUE)
+
+DFCentrality <- data.frame(
+  person = V(actors)$name,
+  Eigenvector = eigen,
+  Closeness = close,
+  Betweenness = betw,
+  stringsAsFactors = FALSE
+)
+
+head(DFCentrality)
+```
+
+## Correlation plot with measures
+
+The correlation matrix shows a strong negative relationship between Eigenvector centrality and Closeness (−0.684), which suggests that actors who are connected to other well-connected actors are not always the ones who are closest to everyone else in the network. Closeness and Betweenness are strongly positively correlated (0.766), meaning that actors who are closer to others also tend to fall on many shortest paths and act as connectors between groups. Eigenvector and Betweenness have a weak negative relationship (−0.245), highlighting the difference between being popular in the network versus serving as a bridge.
+
+```{r}
+cor_mat <- cor(DFCentrality[, c("Eigenvector","Closeness","Betweenness")])
+print(round(cor_mat, 3))
+```
+
+```{r}
+cor_df <- as.data.frame(as.table(cor_mat))
+names(cor_df) <- c("Measure1","Measure2","Correlation")
+
+ggplot(cor_df, aes(Measure1, Measure2, fill = Correlation)) +
+  geom_tile() +
+  geom_text(aes(label = round(Correlation, 2)), size = 4) +
+  coord_equal() +
+  theme_minimal() +
+  labs(title = "Correlation among centrality measures")
+```
+
+## **Questions**
+
+Community structure seems likely in this network. The observed transitivity is 0.25, which suggests there is some clustering among actors. In the random network with the same size and density, transitivity is 0.00, which makes the ratio appear infinite due to division by zero (a common issue in small networks with few triangles). Modularity also supports the presence of communities: both Girvan–Newman (0.420) and Louvain (0.412) identify meaningful partitions, with Girvan–Newman producing the slightly stronger result.
+
+Since Girvan–Newman has the higher modularity score, I treat it as the best-performing method and use it for the community visualization.
+
+```{r}
+randomNet <- sample_gnp(vcount(actors), p = edge_density(actors), directed = FALSE)
+
+t_real <- transitivity(actors, type = "global")
+t_rand <- transitivity(randomNet, type = "global")
+
+cat("Transitivity real:", round(t_real, 3), "\n")
+cat("Transitivity random:", round(t_rand, 3), "\n")
+cat("Ratio real/random:", round(t_real / t_rand, 2), "\n")
+```
+
+Community Detection: Girvan-Newman and Louvain
+
+```{r warning=FALSE}
+gn <- cluster_edge_betweenness(actors)
+lv <- cluster_louvain(actors)
+
+mod_gn <- modularity(gn)
+mod_lv <- modularity(lv)
+
+cat("Girvan-Newman modularity:", round(mod_gn, 3), "\n")
+cat("Louvain modularity:", round(mod_lv, 3), "\n")
+```
+
+```{r}
+# Pick best by modularity and plot it
+best_method <- ifelse(mod_lv >= mod_gn, "Louvain", "Girvan-Newman")
+cat("Best method:", best_method, "\n")
+
+V(actors)$community <- if (best_method == "Louvain") {
+  as.factor(membership(lv))
+} else {
+  as.factor(membership(gn))
+}
+
+ggraph(actors, layout = "fr") +
+  geom_edge_link(alpha = 0.25) +
+  geom_node_point(aes(color = community), size = 5) +
+  geom_node_text(aes(label = name), repel = TRUE, size = 3, family = "sans") +
+  theme_graph(base_family = "sans")
+```
