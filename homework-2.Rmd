@@ -1,3 +1,7 @@
+---
+---
+---
+
 <center><img src="https://github.com/DACSS-CSSmeths/guidelines/blob/main/pics/small_logo_ccs_meths.jpg?raw=true" width="700"/></center>
 
 # Social Networks in R
