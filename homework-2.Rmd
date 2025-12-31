@@ -4,44 +4,56 @@
 
 ------------------------------------------------------------------------
 
-## 1. Load in libraries
+### 1. Import libraries
 
-```{r}
-library(igraph)
-library(ggraph)
-library(ggplot2)
+```{r warning=FALSE}
+library(igraph)  # network creation + analysis
+library(ggraph)  # network plotting (ggplot-style)
+library(ggplot2) # underlying plotting system
 ```
 
-2.  Set seed for randomization
+### 2. Set seed for randomization
+
+Makes layout and community detection reproducible.
 
 ```{r}
-set.seed(123)
+set.seed(1111)
 ```
 
-### II. Create network from dataframes
+### 3. Read the graph
 
-This network is undirected, named, and weighted. It has 11 vertices, and 14 edges.
-
-The vertex attributes are `wonOscar` (numeric) `color`, `name`, `id`)
-
-The edge attributes are `weight` (numeric)
+This network is undirected, named, and weighted. It has 11 nodes (actors), and 14 edges (co-acting relationships). The node attributes are `wonOscar` (numeric), `name`). The edge attributes are `weight` (numeric).
 
 ```{r}
 
+# Read graphml file from GitHub
 actors <- read_graph("https://raw.githubusercontent.com/DACSS-Anjelica/Homework_2/main/hollywood.graphml", format = "graphml")
 
+# Print a summary of the contents of the graph structure
 summary(actors)
 ```
 
-```{r}
+### 3. Network Visualization
+
+```{r warning=FALSE}
+# Plot the network using ggraph
 ggraph(graph = actors) +
-  geom_edge_link(aes(label = weight), alpha = 0.5, label_size = 2.5, angle_calc = "along") +
+  geom_edge_link(
+    aes(
+      label = weight
+    ),
+    alpha = 0.5,
+    label_size = 2.5,
+    angle_calc = "along"
+  ) +
   geom_node_text(aes(label = name, color = as.factor(wonOscar)), repel = TRUE) +
   scale_color_manual(values = c("red", "blue")) +
   theme_graph()
 ```
 
-### Compute node central measures:
+### 4. Compute node central measures:
+
+Computes eigenvector, closeness, and betweenness centrality and assembles into a dataframe.
 
 ```{r}
 # Eigenvector Centrality
@@ -53,6 +65,7 @@ close <- closeness(actors, normalized = TRUE)
 #Betweeness
 betw  <- betweenness(actors, normalized = TRUE)
 
+# Combines centrality measures into single dataframe for easy interpretation
 DFCentrality <- data.frame(
   person = V(actors)$name,
   Eigenvector = eigen,
@@ -61,22 +74,29 @@ DFCentrality <- data.frame(
   stringsAsFactors = FALSE
 )
 
+# Review the table
 head(DFCentrality)
 ```
 
-## Correlation plot with measures
+### Correlation plot with measures
 
-The correlation matrix shows a strong negative relationship between Eigenvector centrality and Closeness (−0.684), which suggests that actors who are connected to other well-connected actors are not always the ones who are closest to everyone else in the network. Closeness and Betweenness are strongly positively correlated (0.766), meaning that actors who are closer to others also tend to fall on many shortest paths and act as connectors between groups. Eigenvector and Betweenness have a weak negative relationship (−0.245), highlighting the difference between being popular in the network versus serving as a bridge.
+These centrality measures point to different kinds of acting relationships in the network. Eigenvector centrality is strongly negatively related to closeness (−0.684), which suggests that actors who work with very well-connected people are not always the ones who are closest to everyone else overall. Closeness and betweenness, however, are strongly positively related (0.766), meaning that actors who are easier to reach in the network often also help connect different groups of actors. The weaker negative relationship between eigenvector centrality and betweenness (−0.245) shows that being part of a tight circle of frequent collaborators is not the same as acting as a bridge between separate groups.
 
 ```{r}
+
+# Computes correlation matrix for the three centrality measures
 cor_mat <- cor(DFCentrality[, c("Eigenvector","Closeness","Betweenness")])
+
+# Prints rounded correlations for readability
 print(round(cor_mat, 3))
 ```
 
 ```{r}
+# Converts correlation matrix into long format
 cor_df <- as.data.frame(as.table(cor_mat))
 names(cor_df) <- c("Measure1","Measure2","Correlation")
 
+# Plots correlation matrix as a heatmap with values
 ggplot(cor_df, aes(Measure1, Measure2, fill = Correlation)) +
   geom_tile() +
   geom_text(aes(label = round(Correlation, 2)), size = 4) +
@@ -85,47 +105,63 @@ ggplot(cor_df, aes(Measure1, Measure2, fill = Correlation)) +
   labs(title = "Correlation among centrality measures")
 ```
 
-## **Questions**
+## Questions
 
-Community structure seems likely in this network. The observed transitivity is 0.25, which suggests there is some clustering among actors. In the random network with the same size and density, transitivity is 0.00, which makes the ratio appear infinite due to division by zero (a common issue in small networks with few triangles). Modularity also supports the presence of communities: both Girvan–Newman (0.420) and Louvain (0.412) identify meaningful partitions, with Girvan–Newman producing the slightly stronger result.
+### Q1. Is it possible communities are present? Support your answer with computations.
 
-Since Girvan–Newman has the higher modularity score, I treat it as the best-performing method and use it for the community visualization.
+The correlation results show that the different centrality measures capture distinct roles within the actor network. Eigenvector centrality is strongly negatively correlated with closeness (−0.68), indicating that actors who are connected to other highly connected actors are not necessarily the ones who are closest to everyone else in the network. Closeness and betweenness are strongly positively correlated (0.77), suggesting that actors who can reach others quickly also tend to serve as important connectors between different parts of the network. The weaker negative correlation between eigenvector centrality and betweenness (−0.25) further highlights that being influential within a tight collaboration group is different from acting as a bridge between groups. Overall, these patterns show that centrality measures reflect different types of importance rather than a single notion of prominence.
 
 ```{r}
+# Create a random graph with the same number of nodes and similar density as the real network
+
 randomNet <- sample_gnp(vcount(actors), p = edge_density(actors), directed = FALSE)
 
+# Compute global transitivity (clustering coefficient):
 t_real <- transitivity(actors, type = "global")
 t_rand <- transitivity(randomNet, type = "global")
 
+# Print transitivity values
 cat("Transitivity real:", round(t_real, 3), "\n")
 cat("Transitivity random:", round(t_rand, 3), "\n")
 cat("Ratio real/random:", round(t_real / t_rand, 2), "\n")
 ```
 
-Community Detection: Girvan-Newman and Louvain
+### Q2: If the presence of communities is possible, compute the communities using Girvan-Newman and Louvain algorithms. Plot the best result.
+
+Modularity also supports the idea that communities are present in the network. Both community detection methods identify clear groupings of actors, with Girvan–Newman producing a slightly higher modularity score (0.420) than Louvain (0.412). For that reason, I selected the Girvan–Newman results. The resulting communities show two main clusters of actors who have worked together more frequently within their groups than with actors outside of them. One cluster is smaller and more tightly connected, while the other is larger with many overlapping collaborations, suggesting that actors tend to form stable collaboration circles rather than working evenly across the entire network.
 
 ```{r warning=FALSE}
+
+# Detects communities using Girvan–Newman:
 gn <- cluster_edge_betweenness(actors)
+
+# # Detect communities using Louvain:
 lv <- cluster_louvain(actors)
 
+# Compute modularity scores to compare community partition quality
 mod_gn <- modularity(gn)
 mod_lv <- modularity(lv)
 
+# Print modularity results
 cat("Girvan-Newman modularity:", round(mod_gn, 3), "\n")
 cat("Louvain modularity:", round(mod_lv, 3), "\n")
 ```
 
+### **Best Method:** Girvan-Newman
+
 ```{r}
-# Pick best by modularity and plot it
+# Select the best method with higher modularity
 best_method <- ifelse(mod_lv >= mod_gn, "Louvain", "Girvan-Newman")
 cat("Best method:", best_method, "\n")
 
+# Store the chosen community membership as a node attribute
 V(actors)$community <- if (best_method == "Louvain") {
   as.factor(membership(lv))
 } else {
   as.factor(membership(gn))
 }
 
+# Plot the best method
 ggraph(actors, layout = "fr") +
   geom_edge_link(alpha = 0.25) +
   geom_node_point(aes(color = community), size = 5) +
