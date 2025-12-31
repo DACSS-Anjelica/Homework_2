@@ -1,3 +1,7 @@
+---
+---
+---
+
 <img src="https://github.com/DACSS-CSSmeths/guidelines/blob/main/pics/small_logo_ccs_meths.jpg?raw=true" width="700"/>
 
 # Social Networks in R
@@ -78,7 +82,7 @@ DFCentrality <- data.frame(
 head(DFCentrality)
 ```
 
-### Correlation plot with measures
+### 5. Correlation plot with measures
 
 These centrality measures point to different kinds of acting relationships in the network. Eigenvector centrality is strongly negatively related to closeness (−0.684), which suggests that actors who work with very well-connected people are not always the ones who are closest to everyone else overall. Closeness and betweenness, however, are strongly positively related (0.766), meaning that actors who are easier to reach in the network often also help connect different groups of actors. The weaker negative relationship between eigenvector centrality and betweenness (−0.245) shows that being part of a tight circle of frequent collaborators is not the same as acting as a bridge between separate groups.
 
@@ -105,9 +109,9 @@ ggplot(cor_df, aes(Measure1, Measure2, fill = Correlation)) +
   labs(title = "Correlation among centrality measures")
 ```
 
-## Questions
+## 6. Questions
 
-### Q1. Is it possible communities are present? Support your answer with computations.
+#### Q1. Is it possible communities are present? Support your answer with computations.
 
 ```{r}
 # Create a random graph with the same number of nodes and similar density as the real network
@@ -125,7 +129,7 @@ cat("Ratio real/random:", round(t_real / t_rand, 2), "\n")
 
 Yes, it looks like communities may be present, but transitivity alone provides only weak evidence. The global transitivity of the real network is 0.25, while the random network with similar density has a transitivity of 0.243, which results in a ratio close to 1. This means that the level of clustering in the actor network is only slightly higher than what we would expect by chance. Because of this, transitivity by itself does not strongly support the presence of communities, so I rely more on modularity and community detection results to evaluate whether meaningful groups exist.
 
-### Q2: If the presence of communities is possible, compute the communities using Girvan-Newman and Louvain algorithms. Plot the best result.
+#### Q2: If the presence of communities is possible, compute the communities using Girvan-Newman and Louvain algorithms. Plot the best result.
 
 ```{r warning=FALSE}
 
@@ -146,7 +150,7 @@ cat("Louvain modularity:", round(mod_lv, 3), "\n")
 
 Modularity provides stronger support for the presence of communities in the network. Both Girvan–Newman and Louvain identify similar groupings of actors, with Girvan–Newman producing a slightly higher modularity score (0.420) than Louvain (0.412). For that reason, I selected the Girvan–Newman results. The detected communities suggest that actors tend to collaborate within familiar groups more often than across the entire network, even though the small size of the network limits how strong these conclusions can be.
 
-### **Best Method:** Girvan-Newman
+#### **Best Method:** Girvan-Newman
 
 ```{r}
 # Select the best method with higher modularity
@@ -168,6 +172,6 @@ ggraph(actors, layout = "fr") +
   theme_graph(base_family = "sans")
 ```
 
-**Community Plot Interpretation:**
+#### Community Plot Interpretation:
 
 The plot shows two main groups of actors based on how often they have worked together. Actors within the same group are more closely connected to one another, while there are fewer connections between the two groups. One group is smaller and more tightly connected, while the other is larger with more overlapping collaborations. This suggests that actors tend to form collaboration circles rather than working evenly with everyone in the network.
